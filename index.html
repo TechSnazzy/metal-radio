@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Metal Radio</title>
+<meta name="description" content="A tiny web player for my favorite hair / glam / 80s metal radio stations.">
+
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0a0a0c">
+<link rel="icon" href="icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Metal Radio">
+
+<style>
+  :root{
+    --bg:#0a0a0c;
+    --surface:#141418;
+    --surface-2:#1d1d23;
+    --line:#2a2a32;
+    --text:#f4f4f6;
+    --muted:#9a9aa6;
+    --accent:#ff2d55;
+    --accent-2:#ff9500;
+    --safe-top:env(safe-area-inset-top,0px);
+    --safe-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  #app{
+    max-width:640px;
+    margin:0 auto;
+    min-height:100%;
+    display:flex;
+    flex-direction:column;
+    padding-top:var(--safe-top);
+  }
+
+  header{
+    display:flex;align-items:center;gap:10px;
+    padding:18px 20px 14px;
+  }
+  .bolt{
+    width:26px;height:26px;flex:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    -webkit-mask:var(--bolt) center/contain no-repeat;
+            mask:var(--bolt) center/contain no-repeat;
+  }
+  header h1{font-size:17px;letter-spacing:.02em;font-weight:700}
+  header .sub{color:var(--muted);font-size:12px;font-weight:500}
+
+  main{flex:1 1 auto;padding:4px 12px 12px}
+  ul{list-style:none;display:flex;flex-direction:column;gap:8px}
+
+  .station{
+    width:100%;text-align:left;cursor:pointer;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:14px 16px;
+    display:flex;align-items:center;gap:14px;
+    color:inherit;font:inherit;
+    transition:border-color .15s ease,background .15s ease;
+  }
+  .station:hover{border-color:#3a3a44}
+  .station:active{background:var(--surface-2)}
+  .station.active{
+    border-color:transparent;
+    background:linear-gradient(135deg,rgba(255,45,85,.18),rgba(255,149,0,.14));
+    box-shadow:inset 0 0 0 1px rgba(255,45,85,.5);
+  }
+  .station .meta{flex:1 1 auto;min-width:0}
+  .station .name{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .station .tag{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .station.blocked .name{color:var(--muted)}
+
+  /* equalizer indicator */
+  .eq{flex:none;width:20px;height:18px;display:flex;align-items:flex-end;gap:2px}
+  .eq span{width:3px;background:linear-gradient(var(--accent-2),var(--accent));border-radius:2px;height:30%;opacity:.22}
+  .station.active .eq span{opacity:1;height:55%}
+  .station.active.playing .eq span{animation:bounce .9s ease-in-out infinite}
+  .station.active.playing .eq span:nth-child(2){animation-delay:-.7s}
+  .station.active.playing .eq span:nth-child(3){animation-delay:-.4s}
+  .station.active.playing .eq span:nth-child(4){animation-delay:-.9s}
+  @keyframes bounce{0%,100%{height:25%}50%{height:100%}}
+  @media (prefers-reduced-motion:reduce){.station.active.playing .eq span{animation:none;height:60%}}
+
+  .dot{flex:none;width:8px;height:8px;border-radius:50%;background:#444}
+  .station.blocked .dot{background:var(--accent);opacity:.6}
+
+  /* now-playing bar */
+  footer{
+    position:sticky;bottom:0;
+    background:rgba(10,10,12,.85);
+    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+    border-top:1px solid var(--line);
+    padding:12px 16px calc(12px + var(--safe-bottom));
+    display:flex;align-items:center;gap:14px;
+  }
+  footer .np{flex:1 1 auto;min-width:0}
+  footer .np .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  footer .np .status{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px}
+  footer .np .status.live{color:var(--accent-2)}
+  footer .np .status.error{color:var(--accent)}
+  .pulse{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .status.live .pulse{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+
+  button.ctrl{
+    flex:none;width:40px;height:40px;border-radius:50%;
+    border:1px solid var(--line);background:var(--surface);
+    color:var(--text);cursor:pointer;
+    display:grid;place-items:center;
+    transition:background .15s ease;
+  }
+  button.ctrl:hover{background:var(--surface-2)}
+  button.ctrl:disabled{opacity:.35;cursor:default}
+  button.play{
+    width:52px;height:52px;border:none;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff;
+  }
+  button.ctrl svg{width:20px;height:20px;fill:currentColor}
+  button.play svg{width:24px;height:24px}
+
+  .hint{color:var(--muted);font-size:12px;text-align:center;padding:14px 20px 2px}
+  a{color:var(--accent-2)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="bolt" aria-hidden="true"></div>
+    <div>
+      <h1>METAL RADIO</h1>
+      <div class="sub">hair · glam · 80s metal</div>
+    </div>
+  </header>
+
+  <main>
+    <ul id="list" aria-label="Stations"></ul>
+    <p class="hint" id="hint">Tap a station to start. Add to Home Screen for full-screen playback and lock-screen controls.</p>
+  </main>
+
+  <footer>
+    <button class="ctrl" id="prev" title="Previous station" disabled>
+      <svg viewBox="0 0 24 24"><path d="M7 6v12H5V6h2zm12 0v12l-8.5-6L19 6z"/></svg>
+    </button>
+    <button class="ctrl play" id="toggle" title="Play" disabled>
+      <svg id="toggleIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+    </button>
+    <button class="ctrl" id="next" title="Next station" disabled>
+      <svg viewBox="0 0 24 24"><path d="M17 6v12h2V6h-2zM5 6v12l8.5-6L5 6z"/></svg>
+    </button>
+    <div class="np">
+      <div class="name" id="npName">Not playing</div>
+      <div class="status" id="npStatus"><span>Pick a station</span></div>
+    </div>
+  </footer>
+</div>
+
+<audio id="audio" preload="none" crossorigin="anonymous"></audio>
+
+<script>
+(() => {
+  "use strict";
+
+  // Bolt glyph reused for the header mask + inline where needed.
+  document.documentElement.style.setProperty("--bolt",
+    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h6l-1 8 9-12h-6z' fill='black'/%3E%3C/svg%3E\")");
+
+  const STATIONS = [
+    { name: "ROCK ANTENNE Hair Metal", tag: "Hair Metal · Germany", url: "https://stream.rockantenne.de/hair-metal/stream/aacp" },
+    { name: "181.FM — 80's HairBand", tag: "Hair Band · USA", url: "https://listen.181fm.com/181-hairband_128k.mp3" },
+    { name: "Big R Radio — 80s Metal FM", tag: "80s Metal · USA", url: "https://bigrradio.cdnstream1.com/5186_128" },
+    { name: "Hard Rock Heaven", tag: "Hard Rock · USA", url: "https://ais-sa2.cdnstream1.com/1521_128" },
+    { name: "011.fm — House of Hair", tag: "Hair Metal · USA", url: "https://listen.011fm.com/stream16" },
+    { name: "BOB Hair Metal", tag: "Hair Metal · Germany", url: "https://streams.radiobob.de/hairmetal/mp3-192/" },
+    { name: "Glam Rock / Metal — Caprice Radio", tag: "Glam Metal · Russia", url: "http://79.120.39.202:8000/glam" },
+  ];
+
+  const audio   = document.getElementById("audio");
+  const listEl  = document.getElementById("list");
+  const toggle  = document.getElementById("toggle");
+  const toggleIcon = document.getElementById("toggleIcon");
+  const prevBtn = document.getElementById("prev");
+  const nextBtn = document.getElementById("next");
+  const npName  = document.getElementById("npName");
+  const npStatus= document.getElementById("npStatus");
+
+  const PLAY_PATH  = "M8 5v14l11-7z";
+  const PAUSE_PATH = "M6 5h4v14H6zM14 5h4v14h-4z";
+  const httpsPage  = location.protocol === "https:";
+
+  let current = -1;        // index of selected station
+  let intended = false;    // does the user want audio right now?
+  let retries = 0;
+  let connectTimer = null;
+  const MAX_RETRIES = 3;
+
+  // ---- render station list ----
+  STATIONS.forEach((s, i) => {
+    const blocked = httpsPage && s.url.startsWith("http:");
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.className = "station" + (blocked ? " blocked" : "");
+    btn.type = "button";
+    btn.innerHTML = `
+      <span class="${blocked ? "dot" : "eq"}">${blocked ? "" : "<span></span><span></span><span></span><span></span>"}</span>
+      <span class="meta">
+        <span class="name">${s.name}</span>
+        <span class="tag">${blocked ? "Not available over HTTPS — open the app on your network to hear this one" : s.tag}</span>
+      </span>`;
+    btn.addEventListener("click", () => select(i, true));
+    s._blocked = blocked;
+    s._el = btn;
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  });
+
+  // ---- core ----
+  function select(i, userGesture) {
+    if (i === current && intended) { stop(); return; }
+    current = i;
+    intended = true;
+    retries = 0;
+    render();
+    play();
+    if (userGesture) persist();
+  }
+
+  function play() {
+    const s = STATIONS[current];
+    if (!s) return;
+    clearTimeout(connectTimer);
+
+    if (s._blocked) {
+      setStatus("This station only streams over HTTP", "error");
+      intended = false;
+      render();
+      return;
+    }
+
+    setStatus("Connecting…");
+    // Re-assign src every attempt so the stream reconnects cleanly.
+    audio.src = s.url;
+    audio.load();
+    audio.play().catch(err => {
+      // Autoplay rejection or network refusal.
+      if (err && err.name === "NotAllowedError") {
+        setStatus("Tap play to start", "");
+        intended = false;
+        render();
+      } else {
+        fail();
+      }
+    });
+
+    connectTimer = setTimeout(() => {
+      if (intended && audio.readyState < 3) fail();   // no playable data after 12s
+    }, 12000);
+  }
+
+  function stop() {
+    intended = false;
+    clearTimeout(connectTimer);
+    audio.pause();
+    audio.removeAttribute("src");
+    audio.load();
+    setStatus("Stopped", "");
+    render();
+  }
+
+  function fail() {
+    clearTimeout(connectTimer);
+    if (intended && retries < MAX_RETRIES) {
+      retries++;
+      setStatus(`Reconnecting… (${retries}/${MAX_RETRIES})`, "");
+      setTimeout(() => { if (intended) play(); }, 1500 * retries);
+    } else {
+      intended = false;
+      setStatus("Station not responding — try again", "error");
+      render();
+    }
+  }
+
+  function step(dir) {
+    if (!STATIONS.length) return;
+    let i = current < 0 ? 0 : current;
+    for (let n = 0; n < STATIONS.length; n++) {
+      i = (i + dir + STATIONS.length) % STATIONS.length;
+      if (!STATIONS[i]._blocked) break;
+    }
+    select(i, true);
+  }
+
+  // ---- audio events ----
+  audio.addEventListener("playing", () => {
+    clearTimeout(connectTimer);
+    retries = 0;
+    setStatus("Live", "live");
+    render();
+    updateSessionState("playing");
+  });
+  audio.addEventListener("waiting", () => {
+    if (intended) setStatus("Buffering…", "");
+  });
+  audio.addEventListener("pause", () => {
+    // Involuntary pause (e.g. an incoming call) leaves the station selected but
+    // idle; the user taps play to resume.
+    updateSessionState("paused");
+    render();
+  });
+  audio.addEventListener("stalled", () => { if (intended) fail(); });
+  audio.addEventListener("error", () => { if (intended) fail(); });
+  audio.addEventListener("ended", () => { if (intended) fail(); });
+
+  // ---- UI state ----
+  function setStatus(text, cls) {
+    npStatus.className = "status" + (cls ? " " + cls : "");
+    npStatus.innerHTML = (cls === "live" ? '<span class="pulse"></span>' : "") +
+      `<span>${text}</span>`;
+  }
+
+  function render() {
+    const s = STATIONS[current];
+    npName.textContent = s ? s.name : "Not playing";
+    toggle.disabled = !s;
+    prevBtn.disabled = nextBtn.disabled = STATIONS.length < 2;
+
+    const isPlaying = intended && !audio.paused;
+    toggleIcon.querySelector("path").setAttribute("d", isPlaying ? PAUSE_PATH : PLAY_PATH);
+    toggle.title = isPlaying ? "Pause" : "Play";
+
+    STATIONS.forEach((st, i) => {
+      st._el.classList.toggle("active", i === current);
+      st._el.classList.toggle("playing", i === current && isPlaying);
+    });
+    updateSessionMetadata();
+  }
+
+  toggle.addEventListener("click", () => {
+    if (current < 0) { select(0, true); return; }
+    if (intended && !audio.paused) stop();
+    else { intended = true; retries = 0; play(); render(); }
+  });
+  prevBtn.addEventListener("click", () => step(-1));
+  nextBtn.addEventListener("click", () => step(1));
+
+  // ---- Media Session (lock screen / AirPods / keyboard media keys) ----
+  function updateSessionMetadata() {
+    if (!("mediaSession" in navigator)) return;
+    const s = STATIONS[current];
+    if (!s) { navigator.mediaSession.metadata = null; return; }
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: s.name,
+      artist: "Metal Radio",
+      album: s.tag,
+      artwork: [
+        { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+    });
+  }
+  function updateSessionState(state) {
+    if ("mediaSession" in navigator) navigator.mediaSession.playbackState = state;
+  }
+  if ("mediaSession" in navigator) {
+    const ms = navigator.mediaSession;
+    ms.setActionHandler("play",  () => { intended = true; retries = 0; play(); render(); });
+    ms.setActionHandler("pause", () => stop());
+    ms.setActionHandler("stop",  () => stop());
+    ms.setActionHandler("previoustrack", () => step(-1));
+    ms.setActionHandler("nexttrack",     () => step(1));
+  }
+
+  // ---- persistence ----
+  function persist() {
+    try { localStorage.setItem("mr:last", String(current)); } catch (_) {}
+  }
+  function restore() {
+    let i = -1;
+    try { i = parseInt(localStorage.getItem("mr:last"), 10); } catch (_) {}
+    if (Number.isInteger(i) && i >= 0 && i < STATIONS.length) {
+      current = i;
+      render();
+      setStatus("Tap play to start", "");
+    }
+  }
+  restore();
+
+  // ---- service worker (offline shell) ----
+  if ("serviceWorker" in navigator) {
+    addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
+})();
+</script>
+</body>
+</html>
