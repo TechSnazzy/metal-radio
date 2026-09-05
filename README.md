@@ -14,9 +14,14 @@ Session API).
 Works the same in a desktop browser — the layout is responsive and the
 keyboard media keys are wired up.
 
-Tap the star on any station to pin it under a **Favorites** section at the
-top of the list — stored in `localStorage` (`mr:favorites`), so it's local
-to that device/browser, not synced anywhere.
+Tap 🤘 on any station to favorite it (it turns into 🔥) and pin it under a
+**Favorites** section at the top of the list — stored in `localStorage`
+(`mr:favorites`), so it's local to that device/browser, not synced anywhere.
+
+Stations that are genuinely commercial-free get a small teal **NO ADS**
+badge on their own line, separate from the genre/country tag, so it can't
+get squeezed off narrower phone screens (add `adFree: true` to a station's
+entry in `STATIONS` to mark another one).
 
 ## Now playing metadata
 

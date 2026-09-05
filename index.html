@@ -215,15 +215,23 @@
   .station-row{display:flex;align-items:stretch;gap:8px}
 
   .fav-btn{
-    flex:none;width:44px;border:1px solid var(--line);border-radius:14px;
-    background:var(--surface);color:var(--muted);cursor:pointer;
+    flex:none;width:40px;border:1px solid var(--line);border-radius:14px;
+    background:var(--surface);cursor:pointer;
     display:grid;place-items:center;
-    transition:background .15s ease,border-color .15s ease,color .15s ease;
+    transition:background .15s ease,border-color .15s ease,transform .1s ease;
   }
   .fav-btn:hover{border-color:#4a3a6a}
-  .fav-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
-  .fav-btn.active{color:var(--amber);border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.08)}
-  .fav-btn.active svg{fill:var(--amber);stroke:var(--amber)}
+  .fav-btn:active{transform:scale(.94)}
+  .fav-btn .icon{font-size:19px;line-height:1;opacity:.55;filter:grayscale(.6)}
+  .fav-btn.active{border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.1)}
+  .fav-btn.active .icon{opacity:1;filter:none}
+
+  .badge-adfree{
+    display:inline-block;margin-top:4px;
+    font-size:10px;letter-spacing:.04em;font-weight:700;text-transform:uppercase;
+    color:var(--teal);border:1px solid rgba(34,229,207,.4);background:rgba(34,229,207,.08);
+    border-radius:6px;padding:2px 6px;
+  }
 
   .station{
     width:auto;flex:1 1 auto;min-width:0;text-align:left;cursor:pointer;
@@ -336,9 +344,9 @@
     { name: "Hard Rock Heaven", tag: "Hair Metal · Hard Rock", country: "USA", url: "https://ais-sa2.cdnstream1.com/1521_128" },
     { name: "011.FM — House of Hair", tag: "Hair Metal", country: "USA", url: "https://listen.011fm.com/stream16" },
     { name: "BOB Hair Metal", tag: "Hair Metal", country: "Germany", url: "https://streams.radiobob.de/hairmetal/mp3-192/" },
-    { name: "Metal Shop", tag: "80s Metal · Commercial-free", country: "USA", url: "https://cheetah.streemlion.com:1945/stream" },
-    { name: "Hair Band Radio", tag: "Hair Metal · Commercial-free", country: "USA", url: "https://cheetah.streemlion.com:2005/stream" },
-    { name: "Metal ARC Radio", tag: "Hard Rock · No commercials", country: "USA", url: "https://streaming.live365.com/a65345" },
+    { name: "Metal Shop", tag: "80s Metal", country: "USA", adFree: true, url: "https://cheetah.streemlion.com:1945/stream" },
+    { name: "Hair Band Radio", tag: "Hair Metal", country: "USA", adFree: true, url: "https://cheetah.streemlion.com:2005/stream" },
+    { name: "Metal ARC Radio", tag: "Hard Rock", country: "USA", adFree: true, url: "https://streaming.live365.com/a65345" },
     { name: "Netrock101 — The Animal", tag: "80s Hair · Glam", country: "USA", url: "https://play.radioking.io/netrock101-the-animal/813097" },
     { name: "The Strip — Hair Band Rock", tag: "Hair Metal", country: "USA", url: "https://das-sa39.cdnstream1.com/5602_128" },
     { name: "Montiel Rock", tag: "Glam Metal", country: "Brazil", url: "https://radio.mntl.top/listen/montiel_rock/radio.mp3" },
@@ -405,6 +413,7 @@
     saveFavorites();
     favBtn.classList.toggle("active", nowFav);
     favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+    favBtn.querySelector(".icon").textContent = nowFav ? "🔥" : "🤘";
     renderStationOrder();
   }
   function sectionLabel(text) {
@@ -438,15 +447,17 @@
       <span class="meta">
         <span class="name">${s.name}</span>
         <span class="tag">${blocked ? "Not available over HTTPS — open the app on your network to hear this one" : `${s.tag} · ${s.country}`}</span>
+        ${s.adFree ? '<span class="badge-adfree">No Ads</span>' : ""}
       </span>`;
     btn.addEventListener("click", () => select(i, true));
 
     const favBtn = document.createElement("button");
     favBtn.type = "button";
-    favBtn.className = "fav-btn" + (isFavorite(s) ? " active" : "");
+    const startedFav = isFavorite(s);
+    favBtn.className = "fav-btn" + (startedFav ? " active" : "");
     favBtn.title = "Favorite this station";
-    favBtn.setAttribute("aria-pressed", isFavorite(s) ? "true" : "false");
-    favBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
+    favBtn.setAttribute("aria-pressed", startedFav ? "true" : "false");
+    favBtn.innerHTML = `<span class="icon">${startedFav ? "🔥" : "🤘"}</span>`;
     favBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleFavorite(s, favBtn); });
 
     s._blocked = blocked;
