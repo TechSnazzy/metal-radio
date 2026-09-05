@@ -54,14 +54,17 @@ bytes, and adding `crossorigin` would make the browser refuse to play them
 
 ## Icons
 
-`icons/icon.svg` (bolt glyph, transparent background) is the source for the
-"any"-purpose icons (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`,
+`icons/icon.svg` (dark background + bolt) is the single source for every
+size (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`,
 `favicon-32.png`), regenerated with `rsvg-convert -w <size> -h <size>
---background-color=none icons/icon.svg -o <out>.png`. `icon-512-maskable.png`
-is a separate asset from `icon-maskable.svg` (bolt **with** the dark
-rounded-square backing) — Android's adaptive-icon mask needs an opaque
-maskable source or it shows the wallpaper through oddly-shaped cutouts; the
-transparent glyph is only for icons nothing else is going to crop.
+icons/icon.svg -o <out>.png`. The square is **full-bleed — no corner radius
+baked in** and no transparency: each OS applies its own icon mask (iOS
+rounds it, Android's adaptive icons crop it), and a pre-rounded or
+transparent-cornered source just leaves a gap that shows whatever's behind
+it (a light home-screen wallpaper reads as ugly white corners on an
+otherwise-black icon). Full-bleed opaque avoids that entirely, which is why
+the same file works for both the manifest's "any" and "maskable" icon
+entries.
 
 ### Sync from cliamp
 

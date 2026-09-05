@@ -1,13 +1,12 @@
 // Minimal service worker: cache the app shell so the PWA launches offline.
 // Audio streams are cross-origin and are never intercepted.
-const CACHE = "metal-radio-v3";
+const CACHE = "metal-radio-v4";
 const SHELL = [
   "./",
   "index.html",
   "manifest.webmanifest",
   "icons/icon-192.png",
   "icons/icon-512.png",
-  "icons/icon-512-maskable.png",
   "icons/apple-touch-icon.png",
   "icons/favicon-32.png",
 ];
