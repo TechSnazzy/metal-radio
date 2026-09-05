@@ -210,8 +210,23 @@
   .list-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 8px 8px}
   ul{list-style:none;display:flex;flex-direction:column;gap:8px}
 
+  .section-label{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:4px 8px 0}
+
+  .station-row{display:flex;align-items:stretch;gap:8px}
+
+  .fav-btn{
+    flex:none;width:44px;border:1px solid var(--line);border-radius:14px;
+    background:var(--surface);color:var(--muted);cursor:pointer;
+    display:grid;place-items:center;
+    transition:background .15s ease,border-color .15s ease,color .15s ease;
+  }
+  .fav-btn:hover{border-color:#4a3a6a}
+  .fav-btn svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+  .fav-btn.active{color:var(--amber);border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.08)}
+  .fav-btn.active svg{fill:var(--amber);stroke:var(--amber)}
+
   .station{
-    width:100%;text-align:left;cursor:pointer;
+    width:auto;flex:1 1 auto;min-width:0;text-align:left;cursor:pointer;
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:14px;
@@ -374,10 +389,47 @@
   let connectTimer = null;
   const MAX_RETRIES = 3;
 
+  // ---- favorites (pinned to the top, persisted locally) ----
+  let favorites = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem("mr:favorites") || "[]");
+    if (Array.isArray(saved)) favorites = new Set(saved);
+  } catch (_) {}
+  function isFavorite(s) { return favorites.has(s.name); }
+  function saveFavorites() {
+    try { localStorage.setItem("mr:favorites", JSON.stringify([...favorites])); } catch (_) {}
+  }
+  function toggleFavorite(s, favBtn) {
+    const nowFav = !favorites.has(s.name);
+    if (nowFav) favorites.add(s.name); else favorites.delete(s.name);
+    saveFavorites();
+    favBtn.classList.toggle("active", nowFav);
+    favBtn.setAttribute("aria-pressed", nowFav ? "true" : "false");
+    renderStationOrder();
+  }
+  function sectionLabel(text) {
+    const li = document.createElement("li");
+    li.className = "section-label";
+    li.textContent = text;
+    return li;
+  }
+  function renderStationOrder() {
+    listEl.replaceChildren();
+    const favs = STATIONS.filter(isFavorite);
+    const rest = STATIONS.filter(s => !isFavorite(s));
+    if (favs.length) {
+      listEl.appendChild(sectionLabel("Favorites"));
+      favs.forEach(s => listEl.appendChild(s._li));
+      listEl.appendChild(sectionLabel("All Stations"));
+    }
+    rest.forEach(s => listEl.appendChild(s._li));
+  }
+
   // ---- render station list ----
   STATIONS.forEach((s, i) => {
     const blocked = httpsPage && s.url.startsWith("http:");
     const li = document.createElement("li");
+    li.className = "station-row";
     const btn = document.createElement("button");
     btn.className = "station" + (blocked ? " blocked" : "");
     btn.type = "button";
@@ -388,11 +440,22 @@
         <span class="tag">${blocked ? "Not available over HTTPS — open the app on your network to hear this one" : `${s.tag} · ${s.country}`}</span>
       </span>`;
     btn.addEventListener("click", () => select(i, true));
+
+    const favBtn = document.createElement("button");
+    favBtn.type = "button";
+    favBtn.className = "fav-btn" + (isFavorite(s) ? " active" : "");
+    favBtn.title = "Favorite this station";
+    favBtn.setAttribute("aria-pressed", isFavorite(s) ? "true" : "false");
+    favBtn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>`;
+    favBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleFavorite(s, favBtn); });
+
     s._blocked = blocked;
     s._el = btn;
+    s._li = li;
     li.appendChild(btn);
-    listEl.appendChild(li);
+    li.appendChild(favBtn);
   });
+  renderStationOrder();
 
   // ================= now-playing metadata engine =================
   // Static site, no backend: we lean on each stream host's own public

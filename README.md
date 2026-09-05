@@ -14,6 +14,10 @@ Session API).
 Works the same in a desktop browser — the layout is responsive and the
 keyboard media keys are wired up.
 
+Tap the star on any station to pin it under a **Favorites** section at the
+top of the list — stored in `localStorage` (`mr:favorites`), so it's local
+to that device/browser, not synced anywhere.
+
 ## Now playing metadata
 
 There's no backend, so the player reads live artist/title/album straight from

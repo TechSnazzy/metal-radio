@@ -1,6 +1,6 @@
 // Minimal service worker: cache the app shell so the PWA launches offline.
 // Audio streams are cross-origin and are never intercepted.
-const CACHE = "metal-radio-v4";
+const CACHE = "metal-radio-v5";
 const SHELL = [
   "./",
   "index.html",
