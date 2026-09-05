@@ -16,19 +16,26 @@ keyboard media keys are wired up.
 
 ## Now playing metadata
 
-There's no backend, so the player reads live artist/title straight from each
-stream host's own public now-playing API in the browser:
+There's no backend, so the player reads live artist/title/album straight from
+each stream host's own public now-playing API in the browser:
 
-- **laut.fm** stations → `api.laut.fm/station/<id>/current_song`
-- **RadioKing** stations → `api.radioking.io/widget/radio/<slug>/track/current`
+- **laut.fm** stations → `api.laut.fm/station/<id>/current_song` (includes album + cover)
+- **RadioKing** stations → `api.radioking.io/widget/radio/<slug>/track/current` (includes cover)
 - **Zeno.fm** stations → live-pushed via `api.zeno.fm/mounts/metadata/subscribe/<mount>` (SSE)
-- anything else → a best-effort Icecast `status-json.xsl` probe on the stream's origin
+- **cdnstream1.com**-hosted stations → `yp.cdnstream1.com/metadata/<mount>/current.json` (raw ID3 frames — title/artist/album/art), when the metadata ID happens to match the stream's own mount name (not guaranteed, but free to try)
+- anything else → a best-effort Icecast `status-json.xsl` probe on the stream's origin, matched to the exact mount being played (a host can multiplex several stations behind one status page)
 
 When a station doesn't expose any of these (or CORS blocks it), the panel
-just falls back to showing the station name — that's expected, not a bug.
-When we do get an artist/title, cover art comes from the provider if it
-supplies one, else a quick [iTunes Search API](https://performance-partners.apple.com/search-api)
-lookup, used for both the blurred backdrop and the lock-screen artwork.
+shows a plain **"No live track info for this station"** note instead of
+guessing — that's an honest limitation of some platforms (Live365, StreamMonkey/
+RockAntenne, Audalaxy/radiobob, the DAS/cdnstream1 stations whose metadata ID
+doesn't match their stream mount, several old-school Shoutcast/Centova hosts),
+not a bug, and it's roughly a third of the current station list.
+
+When we do get an artist/title, album/cover art fills in from the provider if
+it supplies one, else a quick [iTunes Search API](https://performance-partners.apple.com/search-api)
+lookup — used for the album line, the blurred backdrop, and the lock-screen
+artwork.
 
 ## Stations
 
@@ -44,6 +51,17 @@ The `<audio>` element deliberately has no `crossorigin` attribute — most of
 these indie/underground streams don't send CORS headers on the actual audio
 bytes, and adding `crossorigin` would make the browser refuse to play them
 (this app doesn't touch raw audio samples, so it doesn't need CORS media).
+
+## Icons
+
+`icons/icon.svg` (bolt glyph, transparent background) is the source for the
+"any"-purpose icons (`icon-192.png`, `icon-512.png`, `apple-touch-icon.png`,
+`favicon-32.png`), regenerated with `rsvg-convert -w <size> -h <size>
+--background-color=none icons/icon.svg -o <out>.png`. `icon-512-maskable.png`
+is a separate asset from `icon-maskable.svg` (bolt **with** the dark
+rounded-square backing) — Android's adaptive-icon mask needs an opaque
+maskable source or it shows the wallpaper through oddly-shaped cutouts; the
+transparent glyph is only for icons nothing else is going to crop.
 
 ### Sync from cliamp
 

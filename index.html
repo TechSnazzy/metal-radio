@@ -145,9 +145,14 @@
   }
   .art.has-art::after{display:none}
   .np-text{flex:1 1 auto;min-width:0}
+  .np-eyebrow{font-size:10px;letter-spacing:.1em;color:var(--pink);text-transform:uppercase;margin-bottom:2px}
   .np-track{font-weight:800;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .np-artist{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .np-album{color:var(--muted);font-size:12px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;opacity:.85}
+  .np-album[hidden]{display:none}
   .np-station{font-size:11px;letter-spacing:.04em;color:var(--teal);margin-top:6px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-note{font-size:11px;color:var(--muted);margin-top:6px;font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-note[hidden],.np-station[hidden]{display:none}
 
   /* VU meter */
   .vu{flex:none;width:34px;height:30px;display:flex;align-items:flex-end;justify-content:center;gap:3px}
@@ -264,9 +269,12 @@
     <div class="hero-top">
       <div class="art" id="art"></div>
       <div class="np-text">
+        <div class="np-eyebrow" id="npEyebrow" hidden>Now Playing</div>
         <div class="np-track" id="npTrack">Not playing</div>
         <div class="np-artist" id="npArtist">Pick a station to start</div>
-        <div class="np-station" id="npStation"></div>
+        <div class="np-album" id="npAlbum" hidden></div>
+        <div class="np-station" id="npStation" hidden></div>
+        <div class="np-note" id="npNote" hidden></div>
       </div>
       <div class="vu" id="vu">
         <span></span><span></span><span></span><span></span><span></span>
@@ -344,9 +352,12 @@
   const prevBtn   = document.getElementById("prev");
   const nextBtn   = document.getElementById("next");
   const statusRow = document.getElementById("statusRow");
+  const npEyebrow = document.getElementById("npEyebrow");
   const npTrack   = document.getElementById("npTrack");
   const npArtist  = document.getElementById("npArtist");
+  const npAlbum   = document.getElementById("npAlbum");
   const npStation = document.getElementById("npStation");
+  const npNote    = document.getElementById("npNote");
   const artEl     = document.getElementById("art");
   const vuEl      = document.getElementById("vu");
   const backdropArt = document.getElementById("backdropArt");
@@ -411,7 +422,12 @@
       if (host === "play.radioking.io") {
         return { type: "radioking", id: u.pathname.split("/").filter(Boolean)[0] };
       }
-      return { type: "icecast", origin: u.origin };
+      if (host.endsWith(".cdnstream1.com")) {
+        // Metadata IDs on this network usually (not always) match the stream's
+        // own mount name — cheap to try, harmless 404 + fallback when it doesn't.
+        return { type: "cdnstream1", id: u.pathname.replace(/^\//, ""), mountPath: u.pathname };
+      }
+      return { type: "icecast", origin: u.origin, mountPath: u.pathname };
     }
 
     function splitArtistTitle(raw) {
@@ -441,6 +457,7 @@
       return {
         artist: data.artist && data.artist.name || null,
         title: data.title,
+        album: data.album || null,
         artwork: (data.artist && (data.artist.image || data.artist.thumb)) || null,
       };
     }
@@ -454,24 +471,46 @@
         title = title.slice(artist.length).replace(/^\s*[-–—]\s*/, "").trim() || title;
       }
       if (!title) return null;
-      return { artist, title, artwork: data.cover || null };
+      return { artist, title, album: data.album || null, artwork: data.cover || null };
     }
 
-    async function pollIcecast(origin) {
+    // cdnstream1.com's metadata service exports raw ID3 frames.
+    async function pollCdnstream1(id) {
+      const data = await fetchJSON(`https://yp.cdnstream1.com/metadata/${encodeURIComponent(id)}/current.json`, 4000);
+      const entry = Array.isArray(data) ? data[0] : data;
+      if (!entry || !entry.TIT2) return null;
+      return {
+        artist: entry.TPE1 || null,
+        title: entry.TIT2,
+        album: entry.TALB || null,
+        artwork: entry.WXXX_album_art || null,
+      };
+    }
+
+    async function pollIcecast(origin, mountPath) {
       const data = await fetchJSON(`${origin}/status-json.xsl`, 4000);
       if (!data || !data.icestats || !data.icestats.source) return null;
-      const src = Array.isArray(data.icestats.source) ? data.icestats.source[0] : data.icestats.source;
+      const sources = Array.isArray(data.icestats.source) ? data.icestats.source : [data.icestats.source];
+      // A host can multiplex several mounts under one status page (e.g. XRaydio's
+      // /xraydio3 vs /jukebox) — match the mount we're actually playing, not [0].
+      let src = sources.find(s => {
+        try { return new URL(s.listenurl).pathname === mountPath; } catch (_) { return false; }
+      });
+      if (!src && sources.length === 1) src = sources[0];
       if (!src || !src.title) return null;
       const st = splitArtistTitle(src.title);
-      return st ? { artist: st.artist, title: st.title, artwork: null } : null;
+      return st ? { artist: st.artist, title: st.title, album: null, artwork: null } : null;
     }
 
-    async function lookupArtwork(artist, title) {
+    async function lookupItunes(artist, title) {
       if (!artist || !title) return null;
       const data = await fetchJSON(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + " " + title)}&media=music&limit=1`, 4000);
       const hit = data && data.results && data.results[0];
-      if (!hit || !hit.artworkUrl100) return null;
-      return hit.artworkUrl100.replace("100x100bb", "600x600bb");
+      if (!hit) return null;
+      return {
+        artwork: hit.artworkUrl100 ? hit.artworkUrl100.replace("100x100bb", "600x600bb") : null,
+        album: hit.collectionName || null,
+      };
     }
 
     function emit(meta) {
@@ -480,9 +519,13 @@
       trackKey = key;
       if (!meta) { onUpdate(null); return; }
       onUpdate(meta);
-      if (!meta.artwork && meta.title) {
-        lookupArtwork(meta.artist, meta.title).then(art => {
-          if (art && trackKey === key) onUpdate(Object.assign({}, meta, { artwork: art }));
+      if ((!meta.artwork || !meta.album) && meta.title) {
+        lookupItunes(meta.artist, meta.title).then(extra => {
+          if (!extra || trackKey !== key) return;
+          onUpdate(Object.assign({}, meta, {
+            artwork: meta.artwork || extra.artwork,
+            album: meta.album || extra.album,
+          }));
         });
       }
     }
@@ -506,7 +549,7 @@
             try {
               const msg = JSON.parse(e.data);
               const st = splitArtistTitle(msg.streamTitle);
-              emit(st && st.title ? { artist: st.artist, title: st.title, artwork: null } : null);
+              emit(st && st.title ? { artist: st.artist, title: st.title, album: null, artwork: null } : null);
             } catch (_) {}
           };
           sse.onerror = () => { emit(null); };
@@ -518,7 +561,8 @@
         let job;
         if (p.type === "lautfm" && p.id) job = pollLautfm(p.id);
         else if (p.type === "radioking" && p.id) job = pollRadioking(p.id);
-        else if (p.type === "icecast") job = pollIcecast(p.origin);
+        else if (p.type === "cdnstream1" && p.id) job = pollCdnstream1(p.id);
+        else if (p.type === "icecast") job = pollIcecast(p.origin, p.mountPath);
         else return;
         job.then(emit).catch(() => emit(null));
       };
@@ -674,13 +718,25 @@
   function renderNowPlaying() {
     const s = STATIONS[current];
     if (nowMeta && nowMeta.title) {
+      npEyebrow.hidden = false;
       npTrack.textContent = nowMeta.title;
       npArtist.textContent = nowMeta.artist || (s ? s.name : "");
-      npStation.textContent = s ? `${s.name}` : "";
+      if (nowMeta.album) { npAlbum.textContent = nowMeta.album; npAlbum.hidden = false; }
+      else { npAlbum.hidden = true; npAlbum.textContent = ""; }
+      npStation.textContent = s ? `On ${s.name}` : "";
+      npStation.hidden = !s;
+      npNote.hidden = true;
     } else {
+      npEyebrow.hidden = true;
       npTrack.textContent = s ? s.name : "Not playing";
       npArtist.textContent = s ? `${s.tag} · ${s.country}` : "Pick a station to start";
+      npAlbum.hidden = true;
+      npAlbum.textContent = "";
+      npStation.hidden = true;
       npStation.textContent = "";
+      const showNote = s && intended;
+      npNote.hidden = !showNote;
+      npNote.textContent = showNote ? "No live track info for this station" : "";
     }
     if (nowMeta && nowMeta.artwork) {
       artEl.style.backgroundImage = `url("${nowMeta.artwork}")`;
@@ -735,7 +791,7 @@
     navigator.mediaSession.metadata = new MediaMetadata({
       title: (nowMeta && nowMeta.title) || s.name,
       artist: (nowMeta && nowMeta.artist) || "Metal Radio",
-      album: s.name,
+      album: (nowMeta && nowMeta.album) || s.name,
       artwork,
     });
   }
