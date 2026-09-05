@@ -52,10 +52,9 @@ def main() -> int:
         for key, better in HTTPS_OVERRIDES.items():
             if key in s["name"]:
                 url = better
-        genre = s.get("codec", "")
-        tag = f'{s.get("country", "")}'.strip() or genre
-        tag = f'{_genre_hint(s["name"])} · {country_code(s.get("country", ""))}'.strip(" ·")
-        rows.append(f'    {{ name: {js(name)}, tag: {js(tag)}, url: {js(url)} }},')
+        tag = _genre_hint(s["name"])
+        country = country_code(s.get("country", "")) or "Unknown"
+        rows.append(f'    {{ name: {js(name)}, tag: {js(tag)}, country: {js(country)}, url: {js(url)} }},')
 
     block = "  const STATIONS = [\n" + "\n".join(rows) + "\n  ];"
     html = INDEX.read_text()

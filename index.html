@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Metal Radio</title>
-<meta name="description" content="A tiny web player for my favorite hair / glam / 80s metal radio stations.">
+<meta name="description" content="A retro synthwave web player for hair / glam / 80s metal radio stations, worldwide.">
 
 <link rel="manifest" href="manifest.webmanifest">
-<meta name="theme-color" content="#0a0a0c">
+<meta name="theme-color" content="#0a0612">
 <link rel="icon" href="icons/favicon-32.png" sizes="32x32">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -17,14 +17,16 @@
 
 <style>
   :root{
-    --bg:#0a0a0c;
-    --surface:#141418;
-    --surface-2:#1d1d23;
-    --line:#2a2a32;
-    --text:#f4f4f6;
-    --muted:#9a9aa6;
-    --accent:#ff2d55;
-    --accent-2:#ff9500;
+    --bg:#0a0612;
+    --surface:#150f22;
+    --surface-2:#1e1530;
+    --line:#2e2244;
+    --text:#f5eefc;
+    --muted:#a898c4;
+    --pink:#ff2d95;
+    --purple:#8b5cf6;
+    --teal:#22e5cf;
+    --amber:#ffb020;
     --safe-top:env(safe-area-inset-top,0px);
     --safe-bottom:env(safe-area-inset-bottom,0px);
   }
@@ -36,8 +38,58 @@
     font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     -webkit-font-smoothing:antialiased;
     overscroll-behavior:none;
+    position:relative;
+    isolation:isolate;
   }
+
+  /* ---- retro backdrop: blurred album art + synthwave grid + scanlines + grain ---- */
+  #backdrop{
+    position:fixed;inset:0;z-index:-3;
+    background:
+      radial-gradient(120% 90% at 15% -10%, rgba(255,45,149,.35), transparent 55%),
+      radial-gradient(120% 90% at 100% 0%, rgba(34,229,207,.22), transparent 50%),
+      radial-gradient(140% 100% at 50% 120%, rgba(139,92,246,.35), transparent 55%),
+      var(--bg);
+    background-size:cover;background-position:center;
+    transition:background-image .8s ease;
+  }
+  #backdrop.has-art{
+    background-image:
+      linear-gradient(180deg, rgba(10,6,18,.55), rgba(10,6,18,.88) 70%, var(--bg)),
+      var(--art-url);
+  }
+  #backdropArt{
+    position:fixed;inset:-10%;z-index:-3;
+    background-size:cover;background-position:center;
+    filter:blur(46px) saturate(1.35) brightness(.55);
+    transform:scale(1.1);
+    opacity:0;transition:opacity 1s ease, background-image .6s ease;
+    pointer-events:none;
+  }
+  #backdropArt.show{opacity:1}
+  #grid{
+    position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(139,92,246,.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(139,92,246,.12) 1px, transparent 1px);
+    background-size:38px 38px;
+    -webkit-mask-image:linear-gradient(180deg, transparent, rgba(0,0,0,.7) 45%, transparent 90%);
+            mask-image:linear-gradient(180deg, transparent, rgba(0,0,0,.7) 45%, transparent 90%);
+  }
+  #scanlines{
+    position:fixed;inset:0;z-index:2;pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px, rgba(0,0,0,.18) 3px, rgba(0,0,0,0) 4px);
+    mix-blend-mode:multiply;
+    opacity:.5;
+  }
+  #grain{
+    position:fixed;inset:0;z-index:2;pointer-events:none;opacity:.05;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  @media (prefers-reduced-motion:reduce){ #scanlines{opacity:.3} }
+
   #app{
+    position:relative;z-index:1;
     max-width:640px;
     margin:0 auto;
     min-height:100%;
@@ -48,18 +100,109 @@
 
   header{
     display:flex;align-items:center;gap:10px;
-    padding:18px 20px 14px;
+    padding:18px 20px 6px;
   }
   .bolt{
     width:26px;height:26px;flex:none;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    background:linear-gradient(135deg,var(--pink),var(--amber));
     -webkit-mask:var(--bolt) center/contain no-repeat;
             mask:var(--bolt) center/contain no-repeat;
+    filter:drop-shadow(0 0 6px rgba(255,45,149,.6));
   }
-  header h1{font-size:17px;letter-spacing:.02em;font-weight:700}
-  header .sub{color:var(--muted);font-size:12px;font-weight:500}
+  header h1{
+    font-size:18px;letter-spacing:.06em;font-weight:800;
+    background:linear-gradient(90deg,var(--pink),var(--purple) 55%,var(--teal));
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  header .sub{color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.03em}
 
-  main{flex:1 1 auto;padding:4px 12px 12px}
+  /* ---- now playing hero panel ---- */
+  .hero{
+    margin:10px 16px 6px;
+    padding:18px 18px 16px;
+    border-radius:20px;
+    background:linear-gradient(160deg, rgba(30,21,48,.85), rgba(21,15,34,.85));
+    border:1px solid var(--line);
+    box-shadow:0 0 0 1px rgba(255,45,149,.08) inset, 0 20px 50px -25px rgba(0,0,0,.7);
+    -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  }
+  .hero-top{display:flex;align-items:center;gap:14px}
+  .art{
+    flex:none;width:64px;height:64px;border-radius:14px;
+    background:linear-gradient(135deg, rgba(255,45,149,.35), rgba(34,229,207,.25));
+    background-size:cover;background-position:center;
+    border:1px solid rgba(255,255,255,.08);
+    box-shadow:0 6px 20px -8px rgba(255,45,149,.5);
+    position:relative;overflow:hidden;
+  }
+  .art::after{
+    content:"";position:absolute;inset:0;
+    background:var(--bolt) center/50% no-repeat;
+    background-color:transparent;
+    -webkit-mask:var(--bolt) center/45% no-repeat;mask:var(--bolt) center/45% no-repeat;
+    background:linear-gradient(135deg,#fff8,#fff2);
+    opacity:.5;
+  }
+  .art.has-art::after{display:none}
+  .np-text{flex:1 1 auto;min-width:0}
+  .np-track{font-weight:800;font-size:16px;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np-artist{color:var(--muted);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+  .np-station{font-size:11px;letter-spacing:.04em;color:var(--teal);margin-top:6px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* VU meter */
+  .vu{flex:none;width:34px;height:30px;display:flex;align-items:flex-end;justify-content:center;gap:3px}
+  .vu span{width:4px;border-radius:2px;height:15%;
+    background:linear-gradient(var(--teal),var(--pink));opacity:.3}
+  .vu.live span{opacity:1}
+  .vu.live.playing span{animation:vu 1.1s ease-in-out infinite}
+  .vu.live.playing span:nth-child(1){animation-duration:.9s;animation-delay:-.6s}
+  .vu.live.playing span:nth-child(2){animation-duration:1.2s;animation-delay:-.2s}
+  .vu.live.playing span:nth-child(3){animation-duration:.8s;animation-delay:-.8s}
+  .vu.live.playing span:nth-child(4){animation-duration:1.05s;animation-delay:-.4s}
+  .vu.live.playing span:nth-child(5){animation-duration:.95s;animation-delay:-.1s}
+  @keyframes vu{0%,100%{height:15%}50%{height:95%}}
+  @media (prefers-reduced-motion:reduce){.vu.live.playing span{animation:none;height:60%}}
+
+  .status-row{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:12px;color:var(--muted)}
+  .status-row .pulse{width:7px;height:7px;border-radius:50%;background:var(--teal)}
+  .status-row.live{color:var(--teal)}
+  .status-row.error{color:var(--pink)}
+  .status-row.live .pulse{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* recently played */
+  .history{margin-top:12px;padding-top:12px;border-top:1px dashed var(--line)}
+  .history-title{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+  .history ol{list-style:none;display:flex;flex-direction:column;gap:3px}
+  .history li{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;gap:6px}
+  .history li b{color:var(--text);font-weight:600}
+  .history[hidden]{display:none}
+
+  /* transport controls */
+  .transport{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:18px}
+  button.ctrl{
+    flex:none;width:46px;height:46px;border-radius:50%;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.03);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    color:var(--text);cursor:pointer;
+    display:grid;place-items:center;
+    transition:background .15s ease, box-shadow .15s ease, transform .1s ease;
+  }
+  button.ctrl:hover{background:rgba(255,255,255,.08)}
+  button.ctrl:active{transform:scale(.94)}
+  button.ctrl:disabled{opacity:.3;cursor:default}
+  button.play{
+    width:62px;height:62px;border:none;
+    background:linear-gradient(135deg,var(--pink),var(--purple) 60%,var(--teal));
+    color:#fff;
+    box-shadow:0 0 0 1px rgba(255,255,255,.15) inset, 0 10px 30px -10px rgba(255,45,149,.7);
+  }
+  button.ctrl svg{width:20px;height:20px;fill:currentColor}
+  button.play svg{width:26px;height:26px}
+
+  main{flex:1 1 auto;padding:14px 12px 12px}
+  .list-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 8px 8px}
   ul{list-style:none;display:flex;flex-direction:column;gap:8px}
 
   .station{
@@ -67,26 +210,25 @@
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:14px;
-    padding:14px 16px;
+    padding:13px 15px;
     display:flex;align-items:center;gap:14px;
     color:inherit;font:inherit;
     transition:border-color .15s ease,background .15s ease;
   }
-  .station:hover{border-color:#3a3a44}
+  .station:hover{border-color:#4a3a6a}
   .station:active{background:var(--surface-2)}
   .station.active{
     border-color:transparent;
-    background:linear-gradient(135deg,rgba(255,45,85,.18),rgba(255,149,0,.14));
-    box-shadow:inset 0 0 0 1px rgba(255,45,85,.5);
+    background:linear-gradient(135deg,rgba(255,45,149,.18),rgba(34,229,207,.12));
+    box-shadow:inset 0 0 0 1px rgba(255,45,149,.5);
   }
   .station .meta{flex:1 1 auto;min-width:0}
   .station .name{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .station .tag{display:block;color:var(--muted);font-size:12px;margin-top:2px}
   .station.blocked .name{color:var(--muted)}
 
-  /* equalizer indicator */
   .eq{flex:none;width:20px;height:18px;display:flex;align-items:flex-end;gap:2px}
-  .eq span{width:3px;background:linear-gradient(var(--accent-2),var(--accent));border-radius:2px;height:30%;opacity:.22}
+  .eq span{width:3px;background:linear-gradient(var(--teal),var(--pink));border-radius:2px;height:30%;opacity:.22}
   .station.active .eq span{opacity:1;height:55%}
   .station.active.playing .eq span{animation:bounce .9s ease-in-out infinite}
   .station.active.playing .eq span:nth-child(2){animation-delay:-.7s}
@@ -96,107 +238,120 @@
   @media (prefers-reduced-motion:reduce){.station.active.playing .eq span{animation:none;height:60%}}
 
   .dot{flex:none;width:8px;height:8px;border-radius:50%;background:#444}
-  .station.blocked .dot{background:var(--accent);opacity:.6}
+  .station.blocked .dot{background:var(--pink);opacity:.6}
 
-  /* now-playing bar */
-  footer{
-    position:sticky;bottom:0;
-    background:rgba(10,10,12,.85);
-    -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-    border-top:1px solid var(--line);
-    padding:12px 16px calc(12px + var(--safe-bottom));
-    display:flex;align-items:center;gap:14px;
-  }
-  footer .np{flex:1 1 auto;min-width:0}
-  footer .np .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  footer .np .status{font-size:12px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:6px}
-  footer .np .status.live{color:var(--accent-2)}
-  footer .np .status.error{color:var(--accent)}
-  .pulse{width:7px;height:7px;border-radius:50%;background:currentColor}
-  .status.live .pulse{animation:pulse 1.6s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
-
-  button.ctrl{
-    flex:none;width:40px;height:40px;border-radius:50%;
-    border:1px solid var(--line);background:var(--surface);
-    color:var(--text);cursor:pointer;
-    display:grid;place-items:center;
-    transition:background .15s ease;
-  }
-  button.ctrl:hover{background:var(--surface-2)}
-  button.ctrl:disabled{opacity:.35;cursor:default}
-  button.play{
-    width:52px;height:52px;border:none;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));
-    color:#fff;
-  }
-  button.ctrl svg{width:20px;height:20px;fill:currentColor}
-  button.play svg{width:24px;height:24px}
-
-  .hint{color:var(--muted);font-size:12px;text-align:center;padding:14px 20px 2px}
-  a{color:var(--accent-2)}
+  .hint{color:var(--muted);font-size:12px;text-align:center;padding:14px 20px 24px}
+  a{color:var(--teal)}
 </style>
 </head>
 <body>
+<div id="backdropArt"></div>
+<div id="backdrop"></div>
+<div id="grid"></div>
+<div id="scanlines"></div>
+<div id="grain"></div>
+
 <div id="app">
   <header>
     <div class="bolt" aria-hidden="true"></div>
     <div>
       <h1>METAL RADIO</h1>
-      <div class="sub">hair · glam · 80s metal</div>
+      <div class="sub">hair &middot; glam &middot; 80s metal &middot; worldwide</div>
     </div>
   </header>
 
+  <section class="hero">
+    <div class="hero-top">
+      <div class="art" id="art"></div>
+      <div class="np-text">
+        <div class="np-track" id="npTrack">Not playing</div>
+        <div class="np-artist" id="npArtist">Pick a station to start</div>
+        <div class="np-station" id="npStation"></div>
+      </div>
+      <div class="vu" id="vu">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+    </div>
+    <div class="status-row" id="statusRow"><span>Idle</span></div>
+    <div class="history" id="history" hidden>
+      <div class="history-title">Recently played</div>
+      <ol id="historyList"></ol>
+    </div>
+    <div class="transport">
+      <button class="ctrl" id="prev" title="Previous station" disabled>
+        <svg viewBox="0 0 24 24"><path d="M7 6v12H5V6h2zm12 0v12l-8.5-6L19 6z"/></svg>
+      </button>
+      <button class="ctrl play" id="toggle" title="Play" disabled>
+        <svg id="toggleIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="ctrl" id="next" title="Next station" disabled>
+        <svg viewBox="0 0 24 24"><path d="M17 6v12h2V6h-2zM5 6v12l8.5-6L5 6z"/></svg>
+      </button>
+    </div>
+  </section>
+
   <main>
+    <div class="list-title">Stations</div>
     <ul id="list" aria-label="Stations"></ul>
     <p class="hint" id="hint">Tap a station to start. Add to Home Screen for full-screen playback and lock-screen controls.</p>
   </main>
-
-  <footer>
-    <button class="ctrl" id="prev" title="Previous station" disabled>
-      <svg viewBox="0 0 24 24"><path d="M7 6v12H5V6h2zm12 0v12l-8.5-6L19 6z"/></svg>
-    </button>
-    <button class="ctrl play" id="toggle" title="Play" disabled>
-      <svg id="toggleIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-    </button>
-    <button class="ctrl" id="next" title="Next station" disabled>
-      <svg viewBox="0 0 24 24"><path d="M17 6v12h2V6h-2zM5 6v12l8.5-6L5 6z"/></svg>
-    </button>
-    <div class="np">
-      <div class="name" id="npName">Not playing</div>
-      <div class="status" id="npStatus"><span>Pick a station</span></div>
-    </div>
-  </footer>
 </div>
 
-<audio id="audio" preload="none" crossorigin="anonymous"></audio>
+<audio id="audio" preload="none"></audio>
 
 <script>
 (() => {
   "use strict";
 
-  // Bolt glyph reused for the header mask + inline where needed.
   document.documentElement.style.setProperty("--bolt",
     "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 4 14h6l-1 8 9-12h-6z' fill='black'/%3E%3C/svg%3E\")");
 
   const STATIONS = [
-    { name: "ROCK ANTENNE Hair Metal", tag: "Hair Metal · Germany", url: "https://stream.rockantenne.de/hair-metal/stream/aacp" },
-    { name: "181.FM — 80's HairBand", tag: "Hair Band · USA", url: "https://listen.181fm.com/181-hairband_128k.mp3" },
-    { name: "Big R Radio — 80s Metal FM", tag: "80s Metal · USA", url: "https://bigrradio.cdnstream1.com/5186_128" },
-    { name: "Hard Rock Heaven", tag: "Hard Rock · USA", url: "https://ais-sa2.cdnstream1.com/1521_128" },
-    { name: "011.fm — House of Hair", tag: "Hair Metal · USA", url: "https://listen.011fm.com/stream16" },
-    { name: "BOB Hair Metal", tag: "Hair Metal · Germany", url: "https://streams.radiobob.de/hairmetal/mp3-192/" },
-    { name: "Glam Rock / Metal — Caprice Radio", tag: "Glam Metal · Russia", url: "http://79.120.39.202:8000/glam" },
+    { name: "ROCK ANTENNE Hair Metal", tag: "Hair Metal", country: "Germany", url: "https://stream.rockantenne.de/hair-metal/stream/aacp" },
+    { name: "181.FM — 80's HairBand", tag: "Hair Band", country: "USA", url: "https://listen.181fm.com/181-hairband_128k.mp3" },
+    { name: "Big R Radio — 80s Metal FM", tag: "80s Metal", country: "USA", url: "https://bigrradio.cdnstream1.com/5186_128" },
+    { name: "Hard Rock Heaven", tag: "Hair Metal · Hard Rock", country: "USA", url: "https://ais-sa2.cdnstream1.com/1521_128" },
+    { name: "011.FM — House of Hair", tag: "Hair Metal", country: "USA", url: "https://listen.011fm.com/stream16" },
+    { name: "BOB Hair Metal", tag: "Hair Metal", country: "Germany", url: "https://streams.radiobob.de/hairmetal/mp3-192/" },
+    { name: "Metal Shop", tag: "80s Metal · Commercial-free", country: "USA", url: "https://cheetah.streemlion.com:1945/stream" },
+    { name: "Hair Band Radio", tag: "Hair Metal · Commercial-free", country: "USA", url: "https://cheetah.streemlion.com:2005/stream" },
+    { name: "Metal ARC Radio", tag: "Hard Rock · No commercials", country: "USA", url: "https://streaming.live365.com/a65345" },
+    { name: "Netrock101 — The Animal", tag: "80s Hair · Glam", country: "USA", url: "https://play.radioking.io/netrock101-the-animal/813097" },
+    { name: "The Strip — Hair Band Rock", tag: "Hair Metal", country: "USA", url: "https://das-sa39.cdnstream1.com/5602_128" },
+    { name: "Montiel Rock", tag: "Glam Metal", country: "Brazil", url: "https://radio.mntl.top/listen/montiel_rock/radio.mp3" },
+    { name: "Heavy Metal History Radio", tag: "Classic Metal", country: "USA", url: "https://stream.zeno.fm/8j4omrwrk2puv" },
+    { name: "Rock Melodic Radio", tag: "AOR · Melodic Rock", country: "Greece", url: "https://i4.streams.ovh:2200/ssl/rockmelo?mp=/stream" },
+    { name: "Melodic Radio", tag: "Melodic Rock", country: "Germany", url: "https://www.tunefm.de:2000/stream/melodicradio" },
+    { name: "HARD ROCK PALACE", tag: "Hard Rock", country: "Germany", url: "https://stream.laut.fm/hrp" },
+    { name: "Metal Invasion Radio", tag: "Hard Rock · Metal", country: "France", url: "https://radio.metal-invasion.fr/radio/8000/stream96" },
+    { name: "METALSCENA netRADIO", tag: "Heavy Metal · Underground", country: "Slovakia", url: "https://listen.radioking.com/radio/263218/stream/308365" },
+    { name: "Pinguin Aardschok", tag: "Metal", country: "Netherlands", url: "https://streams.pinguinradio.com/Aardschok192.mp3" },
+    { name: "LAGERFEUERMETAL", tag: "Power Metal · Hard Rock", country: "Germany", url: "https://lagerfeuermetal.stream.laut.fm/lagerfeuermetal" },
+    { name: "Monsters of Rock USSR", tag: "Hard Rock", country: "Russia", url: "https://stream-51.zeno.fm/6nbz7p2w908uv" },
+    { name: "XRaydio 3", tag: "Glam Rock · Garage", country: "Bulgaria", url: "https://xraydio.ddns.net/xraydio3" },
+    { name: "Almost Hell Radio", tag: "Underground Metal", country: "Mexico", url: "https://almosthellradio.duckdns.org/listen/almost_hell_radio/radio.mp3" },
+    { name: "MAXIMUM Ozzy Osbourne", tag: "Hard Rock", country: "Russia", url: "https://maximum-ozzy.hostingradio.ru/ozzy96.aacp" },
+    { name: "Espiritu Rock", tag: "Hard Rock", country: "Colombia", url: "https://centova92.instainternet.com/proxy/santiago/stream" },
+    { name: "Dark Symphony Radio", tag: "Symphonic · Hard Rock", country: "Indonesia", url: "https://streaming.live365.com/a02267" },
+    { name: "HuilaGeek Radio", tag: "Heavy Metal", country: "Colombia", url: "https://stream-50.zeno.fm/8smiwwvtfxxvv" },
+    { name: "100 Greatest Heavy Metal", tag: "Classic Metal", country: "Canada", url: "https://cast1.torontocast.com:4660/stream" },
   ];
 
-  const audio   = document.getElementById("audio");
-  const listEl  = document.getElementById("list");
-  const toggle  = document.getElementById("toggle");
-  const toggleIcon = document.getElementById("toggleIcon");
-  const prevBtn = document.getElementById("prev");
-  const nextBtn = document.getElementById("next");
-  const npName  = document.getElementById("npName");
-  const npStatus= document.getElementById("npStatus");
+  const audio     = document.getElementById("audio");
+  const listEl    = document.getElementById("list");
+  const toggle    = document.getElementById("toggle");
+  const toggleIcon= document.getElementById("toggleIcon");
+  const prevBtn   = document.getElementById("prev");
+  const nextBtn   = document.getElementById("next");
+  const statusRow = document.getElementById("statusRow");
+  const npTrack   = document.getElementById("npTrack");
+  const npArtist  = document.getElementById("npArtist");
+  const npStation = document.getElementById("npStation");
+  const artEl     = document.getElementById("art");
+  const vuEl      = document.getElementById("vu");
+  const backdropArt = document.getElementById("backdropArt");
+  const historyBox = document.getElementById("history");
+  const historyList = document.getElementById("historyList");
 
   const PLAY_PATH  = "M8 5v14l11-7z";
   const PAUSE_PATH = "M6 5h4v14H6zM14 5h4v14h-4z";
@@ -219,7 +374,7 @@
       <span class="${blocked ? "dot" : "eq"}">${blocked ? "" : "<span></span><span></span><span></span><span></span>"}</span>
       <span class="meta">
         <span class="name">${s.name}</span>
-        <span class="tag">${blocked ? "Not available over HTTPS — open the app on your network to hear this one" : s.tag}</span>
+        <span class="tag">${blocked ? "Not available over HTTPS — open the app on your network to hear this one" : `${s.tag} · ${s.country}`}</span>
       </span>`;
     btn.addEventListener("click", () => select(i, true));
     s._blocked = blocked;
@@ -228,12 +383,194 @@
     listEl.appendChild(li);
   });
 
+  // ================= now-playing metadata engine =================
+  // Static site, no backend: we lean on each stream host's own public
+  // now-playing API (laut.fm / RadioKing / Zeno.fm all expose CORS-open
+  // JSON or SSE endpoints) and fall back to a generic Icecast status probe.
+  // Anything unrecognized — or any host that fails/blocks CORS — just
+  // falls back to showing the station name, per spec.
+  const NowPlaying = (() => {
+    let pollTimer = null;
+    let sse = null;
+    let trackKey = null;
+    let onUpdate = () => {};
+
+    function detectProvider(url) {
+      let u;
+      try { u = new URL(url); } catch (_) { return null; }
+      const host = u.hostname;
+      if (host === "stream.laut.fm") {
+        return { type: "lautfm", id: u.pathname.replace(/^\//, "") };
+      }
+      if (host.endsWith(".stream.laut.fm")) {
+        return { type: "lautfm", id: host.split(".")[0] };
+      }
+      if (host === "stream.zeno.fm" || /^stream-\d+\.zeno\.fm$/.test(host)) {
+        return { type: "zeno", id: u.pathname.replace(/^\//, "") };
+      }
+      if (host === "play.radioking.io") {
+        return { type: "radioking", id: u.pathname.split("/").filter(Boolean)[0] };
+      }
+      return { type: "icecast", origin: u.origin };
+    }
+
+    function splitArtistTitle(raw) {
+      if (!raw) return null;
+      const parts = raw.split(/\s+[-–—]\s+/);
+      if (parts.length >= 2) return { artist: parts[0].trim(), title: parts.slice(1).join(" - ").trim() };
+      return { artist: null, title: raw.trim() };
+    }
+
+    async function fetchJSON(url, ms) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), ms || 5000);
+      try {
+        const res = await fetch(url, { signal: ctrl.signal, mode: "cors" });
+        if (!res.ok) return null;
+        return await res.json();
+      } catch (_) {
+        return null;
+      } finally {
+        clearTimeout(t);
+      }
+    }
+
+    async function pollLautfm(id) {
+      const data = await fetchJSON(`https://api.laut.fm/station/${encodeURIComponent(id)}/current_song`);
+      if (!data || !data.title) return null;
+      return {
+        artist: data.artist && data.artist.name || null,
+        title: data.title,
+        artwork: (data.artist && (data.artist.image || data.artist.thumb)) || null,
+      };
+    }
+
+    async function pollRadioking(id) {
+      const data = await fetchJSON(`https://api.radioking.io/widget/radio/${encodeURIComponent(id)}/track/current`);
+      if (!data) return null;
+      let title = data.title || null;
+      const artist = data.artist || null;
+      if (title && artist && title.toLowerCase().startsWith(artist.toLowerCase())) {
+        title = title.slice(artist.length).replace(/^\s*[-–—]\s*/, "").trim() || title;
+      }
+      if (!title) return null;
+      return { artist, title, artwork: data.cover || null };
+    }
+
+    async function pollIcecast(origin) {
+      const data = await fetchJSON(`${origin}/status-json.xsl`, 4000);
+      if (!data || !data.icestats || !data.icestats.source) return null;
+      const src = Array.isArray(data.icestats.source) ? data.icestats.source[0] : data.icestats.source;
+      if (!src || !src.title) return null;
+      const st = splitArtistTitle(src.title);
+      return st ? { artist: st.artist, title: st.title, artwork: null } : null;
+    }
+
+    async function lookupArtwork(artist, title) {
+      if (!artist || !title) return null;
+      const data = await fetchJSON(`https://itunes.apple.com/search?term=${encodeURIComponent(artist + " " + title)}&media=music&limit=1`, 4000);
+      const hit = data && data.results && data.results[0];
+      if (!hit || !hit.artworkUrl100) return null;
+      return hit.artworkUrl100.replace("100x100bb", "600x600bb");
+    }
+
+    function emit(meta) {
+      const key = meta ? `${meta.artist || ""}::${meta.title || ""}` : null;
+      if (key === trackKey) return; // no change
+      trackKey = key;
+      if (!meta) { onUpdate(null); return; }
+      onUpdate(meta);
+      if (!meta.artwork && meta.title) {
+        lookupArtwork(meta.artist, meta.title).then(art => {
+          if (art && trackKey === key) onUpdate(Object.assign({}, meta, { artwork: art }));
+        });
+      }
+    }
+
+    function stop() {
+      if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      if (sse) { sse.close(); sse = null; }
+      trackKey = null;
+    }
+
+    function start(station, cb) {
+      stop();
+      onUpdate = cb;
+      const p = detectProvider(station.url);
+      if (!p) return;
+
+      if (p.type === "zeno" && p.id) {
+        try {
+          sse = new EventSource(`https://api.zeno.fm/mounts/metadata/subscribe/${p.id}`);
+          sse.onmessage = (e) => {
+            try {
+              const msg = JSON.parse(e.data);
+              const st = splitArtistTitle(msg.streamTitle);
+              emit(st && st.title ? { artist: st.artist, title: st.title, artwork: null } : null);
+            } catch (_) {}
+          };
+          sse.onerror = () => { emit(null); };
+        } catch (_) {}
+        return;
+      }
+
+      const poll = () => {
+        let job;
+        if (p.type === "lautfm" && p.id) job = pollLautfm(p.id);
+        else if (p.type === "radioking" && p.id) job = pollRadioking(p.id);
+        else if (p.type === "icecast") job = pollIcecast(p.origin);
+        else return;
+        job.then(emit).catch(() => emit(null));
+      };
+      poll();
+      pollTimer = setInterval(poll, 15000);
+    }
+
+    return { start, stop };
+  })();
+
+  // ---- recently played history (per active station) ----
+  let history = [];
+  function pushHistory(meta) {
+    if (!meta || !meta.title) return;
+    const key = `${meta.artist || ""}::${meta.title}`;
+    if (history.length && history[0]._key === key) return;
+    history.unshift({ _key: key, artist: meta.artist, title: meta.title });
+    history = history.slice(0, 5);
+    renderHistory();
+  }
+  function resetHistory() {
+    history = [];
+    renderHistory();
+  }
+  function renderHistory() {
+    if (!history.length) { historyBox.hidden = true; historyList.innerHTML = ""; return; }
+    historyBox.hidden = false;
+    historyList.innerHTML = history.map(h =>
+      `<li>${h.artist ? `<b>${escapeHtml(h.artist)}</b> — ${escapeHtml(h.title)}` : escapeHtml(h.title)}</li>`
+    ).join("");
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  let nowMeta = null; // current track metadata, or null
+  function onMetaUpdate(meta) {
+    const isNewTrack = meta && (!nowMeta || nowMeta.title !== meta.title || nowMeta.artist !== meta.artist);
+    nowMeta = meta;
+    if (isNewTrack) pushHistory(meta);
+    renderNowPlaying();
+    updateSessionMetadata();
+  }
+
   // ---- core ----
   function select(i, userGesture) {
     if (i === current && intended) { stop(); return; }
     current = i;
     intended = true;
     retries = 0;
+    nowMeta = null;
+    resetHistory();
     render();
     play();
     if (userGesture) persist();
@@ -252,11 +589,9 @@
     }
 
     setStatus("Connecting…");
-    // Re-assign src every attempt so the stream reconnects cleanly.
     audio.src = s.url;
     audio.load();
     audio.play().catch(err => {
-      // Autoplay rejection or network refusal.
       if (err && err.name === "NotAllowedError") {
         setStatus("Tap play to start", "");
         intended = false;
@@ -267,7 +602,7 @@
     });
 
     connectTimer = setTimeout(() => {
-      if (intended && audio.readyState < 3) fail();   // no playable data after 12s
+      if (intended && audio.readyState < 3) fail();
     }, 12000);
   }
 
@@ -277,6 +612,8 @@
     audio.pause();
     audio.removeAttribute("src");
     audio.load();
+    NowPlaying.stop();
+    nowMeta = null;
     setStatus("Stopped", "");
     render();
   }
@@ -290,6 +627,7 @@
     } else {
       intended = false;
       setStatus("Station not responding — try again", "error");
+      NowPlaying.stop();
       render();
     }
   }
@@ -308,33 +646,56 @@
   audio.addEventListener("playing", () => {
     clearTimeout(connectTimer);
     retries = 0;
+    intended = true; // the browser is actually playing; trust that over any stale retry bookkeeping
     setStatus("Live", "live");
     render();
     updateSessionState("playing");
+    NowPlaying.start(STATIONS[current], onMetaUpdate);
   });
   audio.addEventListener("waiting", () => {
     if (intended) setStatus("Buffering…", "");
   });
   audio.addEventListener("pause", () => {
-    // Involuntary pause (e.g. an incoming call) leaves the station selected but
-    // idle; the user taps play to resume.
     updateSessionState("paused");
     render();
   });
-  audio.addEventListener("stalled", () => { if (intended) fail(); });
+  // "stalled" fires on plenty of healthy connections during the initial buffer
+  // (small/indie hosts are slower to deliver first bytes than big CDNs) — the
+  // connectTimer below is the real give-up signal for a stuck first connect.
   audio.addEventListener("error", () => { if (intended) fail(); });
   audio.addEventListener("ended", () => { if (intended) fail(); });
 
   // ---- UI state ----
   function setStatus(text, cls) {
-    npStatus.className = "status" + (cls ? " " + cls : "");
-    npStatus.innerHTML = (cls === "live" ? '<span class="pulse"></span>' : "") +
-      `<span>${text}</span>`;
+    statusRow.className = "status-row" + (cls ? " " + cls : "");
+    statusRow.innerHTML = (cls === "live" ? '<span class="pulse"></span>' : "") + `<span>${text}</span>`;
+  }
+
+  function renderNowPlaying() {
+    const s = STATIONS[current];
+    if (nowMeta && nowMeta.title) {
+      npTrack.textContent = nowMeta.title;
+      npArtist.textContent = nowMeta.artist || (s ? s.name : "");
+      npStation.textContent = s ? `${s.name}` : "";
+    } else {
+      npTrack.textContent = s ? s.name : "Not playing";
+      npArtist.textContent = s ? `${s.tag} · ${s.country}` : "Pick a station to start";
+      npStation.textContent = "";
+    }
+    if (nowMeta && nowMeta.artwork) {
+      artEl.style.backgroundImage = `url("${nowMeta.artwork}")`;
+      artEl.classList.add("has-art");
+      backdropArt.style.backgroundImage = `url("${nowMeta.artwork}")`;
+      backdropArt.classList.add("show");
+    } else {
+      artEl.style.backgroundImage = "";
+      artEl.classList.remove("has-art");
+      backdropArt.classList.remove("show");
+    }
   }
 
   function render() {
     const s = STATIONS[current];
-    npName.textContent = s ? s.name : "Not playing";
     toggle.disabled = !s;
     prevBtn.disabled = nextBtn.disabled = STATIONS.length < 2;
 
@@ -342,11 +703,14 @@
     toggleIcon.querySelector("path").setAttribute("d", isPlaying ? PAUSE_PATH : PLAY_PATH);
     toggle.title = isPlaying ? "Pause" : "Play";
 
+    vuEl.classList.toggle("live", !!s && intended);
+    vuEl.classList.toggle("playing", isPlaying);
+
     STATIONS.forEach((st, i) => {
       st._el.classList.toggle("active", i === current);
       st._el.classList.toggle("playing", i === current && isPlaying);
     });
-    updateSessionMetadata();
+    renderNowPlaying();
   }
 
   toggle.addEventListener("click", () => {
@@ -362,14 +726,17 @@
     if (!("mediaSession" in navigator)) return;
     const s = STATIONS[current];
     if (!s) { navigator.mediaSession.metadata = null; return; }
+    const artwork = (nowMeta && nowMeta.artwork)
+      ? [{ src: nowMeta.artwork, sizes: "600x600", type: "image/jpeg" }]
+      : [
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
+        ];
     navigator.mediaSession.metadata = new MediaMetadata({
-      title: s.name,
-      artist: "Metal Radio",
-      album: s.tag,
-      artwork: [
-        { src: "icons/icon-192.png", sizes: "192x192", type: "image/png" },
-        { src: "icons/icon-512.png", sizes: "512x512", type: "image/png" },
-      ],
+      title: (nowMeta && nowMeta.title) || s.name,
+      artist: (nowMeta && nowMeta.artist) || "Metal Radio",
+      album: s.name,
+      artwork,
     });
   }
   function updateSessionState(state) {
