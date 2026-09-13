@@ -31,7 +31,7 @@
     --safe-bottom:env(safe-area-inset-bottom,0px);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html,body{height:100%}
+  html,body{height:100%;overflow:hidden}
   body{
     background:var(--bg);
     color:var(--text);
@@ -92,13 +92,15 @@
     position:relative;z-index:1;
     max-width:640px;
     margin:0 auto;
-    min-height:100%;
+    height:100vh;
+    height:100dvh;
     display:flex;
     flex-direction:column;
     padding-top:var(--safe-top);
   }
 
   header{
+    flex:none;
     display:flex;align-items:center;gap:10px;
     padding:18px 20px 6px;
   }
@@ -118,6 +120,7 @@
 
   /* ---- now playing hero panel ---- */
   .hero{
+    flex:none;
     margin:10px 16px 6px;
     padding:18px 18px 16px;
     border-radius:20px;
@@ -206,7 +209,14 @@
   button.ctrl svg{width:20px;height:20px;fill:currentColor}
   button.play svg{width:26px;height:26px}
 
-  main{flex:1 1 auto;padding:14px 12px 12px}
+  main{
+    flex:1 1 auto;
+    min-height:0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    padding:14px 12px calc(12px + var(--safe-bottom));
+  }
   .list-title{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 8px 8px}
   ul{list-style:none;display:flex;flex-direction:column;gap:8px}
 
