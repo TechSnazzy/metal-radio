@@ -405,7 +405,7 @@
   let intended = false;    // does the user want audio right now?
   let retries = 0;
   let connectTimer = null;
-  const MAX_RETRIES = 3;
+  const MAX_RETRIES = 5;
 
   // ---- favorites (pinned to the top, persisted locally) ----
   let favorites = new Set();
@@ -731,7 +731,7 @@
 
     connectTimer = setTimeout(() => {
       if (intended && audio.readyState < 3) fail();
-    }, 12000);
+    }, 20000);
   }
 
   function stop() {
